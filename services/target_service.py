@@ -3,6 +3,13 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from huaweicloudsdkagentarts.v1 import (
+    CoreGatewayCredentialProvider,
+    CoreGatewayCredentialProviderConfiguration,
+    CoreGatewayMcpServerTargetConfiguration,
+    CoreGatewayOAuthCredentialProvider,
+    CoreGatewayTargetConfiguration,
+)
 from hw_agentrun_wrapper.services.mcp_target_http import MCPTargetHttpService
 
 from domain.constants import TARGET_STATUS_FAILED, TARGET_STATUS_READY
@@ -34,15 +41,16 @@ class TargetService:
 
     def get_target_by_name(self, gateway_id: str, target_name: str) -> TargetInfo | None:
         try:
-            targets = self.target_http_service.list_mcp_gateway_targets(gateway_id=gateway_id)
+            resp = self.target_http_service.list_mcp_gateway_targets(gateway_id=gateway_id, limit=100, offset=0)
         except Exception as exc:  # noqa: BLE001
             raise TargetEnsureError(f"查询 target 失败: {exc}") from exc
 
-        for item in (targets or []):
+        targets = _safe_get(resp, "targets") or resp or []
+        for item in targets:
             name = _safe_get(item, "name")
             if name == target_name:
                 return TargetInfo(
-                    target_id=_safe_get(item, "id") or _safe_get(item, "target_id"),
+                    target_id=_safe_get(item, "target_id") or _safe_get(item, "id"),
                     target_name=name,
                     target_status=_safe_get(item, "status") or "unknown",
                     endpoint=_extract_endpoint(item),
@@ -53,54 +61,52 @@ class TargetService:
         return None
 
     def create_target(self, gateway_id: str, config: TargetConfig) -> TargetInfo:
+        target_cfg = _build_target_configuration(config.endpoint, config.server_type)
+        cred_cfg = _build_oauth_credential_configuration(config.provider_name, config.grant_type, config.scopes)
         try:
-            response = self.target_http_service.create_mcp_gateway_target(
+            resp = self.target_http_service.create_mcp_gateway_target(
                 gateway_id=gateway_id,
                 name=config.target_name,
                 description=config.description,
-                endpoint=config.endpoint,
-                server_type=config.server_type,
-                provider_name=config.provider_name,
-                grant_type=config.grant_type,
-                scopes=config.scopes,
+                target_configuration=target_cfg,
+                credential_provider_configuration=cred_cfg,
             )
         except Exception as exc:  # noqa: BLE001
             raise TargetEnsureError(f"创建 target 失败: {exc}") from exc
 
         return TargetInfo(
-            target_id=_safe_get(response, "id") or _safe_get(response, "target_id"),
-            target_name=_safe_get(response, "name") or config.target_name,
-            target_status=_safe_get(response, "status") or "creating",
+            target_id=_safe_get(resp, "target_id") or _safe_get(resp, "id"),
+            target_name=_safe_get(resp, "name") or config.target_name,
+            target_status=_safe_get(resp, "status") or "creating",
             endpoint=config.endpoint,
             server_type=config.server_type,
             reused=False,
-            raw=response,
+            raw=resp,
         )
 
     def update_target(self, gateway_id: str, target_id: str, config: TargetConfig) -> TargetInfo:
+        target_cfg = _build_target_configuration(config.endpoint, config.server_type)
+        cred_cfg = _build_oauth_credential_configuration(config.provider_name, config.grant_type, config.scopes)
         try:
-            response = self.target_http_service.update_mcp_gateway_target(
+            resp = self.target_http_service.update_mcp_gateway_target(
                 gateway_id=gateway_id,
                 target_id=target_id,
                 name=config.target_name,
                 description=config.description,
-                endpoint=config.endpoint,
-                server_type=config.server_type,
-                provider_name=config.provider_name,
-                grant_type=config.grant_type,
-                scopes=config.scopes,
+                target_configuration=target_cfg,
+                credential_provider_configuration=cred_cfg,
             )
         except Exception as exc:  # noqa: BLE001
             raise TargetEnsureError(f"更新 target 失败: {exc}") from exc
 
         return TargetInfo(
-            target_id=_safe_get(response, "id") or _safe_get(response, "target_id") or target_id,
-            target_name=_safe_get(response, "name") or config.target_name,
-            target_status=_safe_get(response, "status") or "updating",
+            target_id=_safe_get(resp, "target_id") or _safe_get(resp, "id") or target_id,
+            target_name=_safe_get(resp, "name") or config.target_name,
+            target_status=_safe_get(resp, "status") or "updating",
             endpoint=config.endpoint,
             server_type=config.server_type,
             reused=True,
-            raw=response,
+            raw=resp,
         )
 
     def wait_target_ready(
@@ -112,20 +118,20 @@ class TargetService:
     ) -> TargetInfo:
         for _ in range(max_attempts):
             try:
-                response = self.target_http_service.get_mcp_gateway_target(gateway_id=gateway_id, target_id=target_id)
+                resp = self.target_http_service.get_mcp_gateway_target(gateway_id=gateway_id, target_id=target_id)
             except Exception as exc:  # noqa: BLE001
                 raise TargetEnsureError(f"查询 target 详情失败: {exc}") from exc
 
-            status = _safe_get(response, "status") or "unknown"
+            status = _safe_get(resp, "status") or "unknown"
             if status == TARGET_STATUS_READY:
                 return TargetInfo(
-                    target_id=_safe_get(response, "id") or _safe_get(response, "target_id") or target_id,
-                    target_name=_safe_get(response, "name") or "",
+                    target_id=_safe_get(resp, "target_id") or _safe_get(resp, "id") or target_id,
+                    target_name=_safe_get(resp, "name") or "",
                     target_status=status,
-                    endpoint=_extract_endpoint(response),
-                    server_type=_extract_server_type(response),
+                    endpoint=_extract_endpoint(resp),
+                    server_type=_extract_server_type(resp),
                     reused=False,
-                    raw=response,
+                    raw=resp,
                 )
             if status == TARGET_STATUS_FAILED:
                 raise TargetNotReadyError(f"target 进入失败状态: {target_id}")
@@ -149,12 +155,35 @@ class TargetService:
         )
 
 
+def _build_target_configuration(endpoint: str, server_type: str) -> CoreGatewayTargetConfiguration:
+    return CoreGatewayTargetConfiguration(
+        mcp_server=CoreGatewayMcpServerTargetConfiguration(endpoint=endpoint, server_type=server_type)
+    )
+
+
+def _build_oauth_credential_configuration(
+    provider_name: str,
+    grant_type: str,
+    scopes: list[str],
+) -> CoreGatewayCredentialProviderConfiguration:
+    oauth_provider = CoreGatewayOAuthCredentialProvider(
+        provider_name=provider_name,
+        grant_type=grant_type,
+        scopes=scopes or None,
+    )
+    credential_provider = CoreGatewayCredentialProvider(oauth_credential_provider=oauth_provider)
+    return CoreGatewayCredentialProviderConfiguration(
+        credential_provider_type="oauth",
+        credential_provider=credential_provider,
+    )
+
+
 def _extract_endpoint(data: Any) -> str:
-    return _dig(data, "target_configuration", "mcp_server", "endpoint") or _dig(data, "endpoint") or ""
+    return _dig(data, "target_configuration", "mcp_server", "endpoint") or ""
 
 
 def _extract_server_type(data: Any) -> str:
-    return _dig(data, "target_configuration", "mcp_server", "server_type") or _dig(data, "server_type") or ""
+    return _dig(data, "target_configuration", "mcp_server", "server_type") or ""
 
 
 def _extract_provider_name(data: Any) -> str:
@@ -166,7 +195,6 @@ def _extract_provider_name(data: Any) -> str:
             "oauth_credential_provider",
             "provider_name",
         )
-        or _dig(data, "provider_name")
         or ""
     )
 
@@ -180,7 +208,6 @@ def _extract_grant_type(data: Any) -> str:
             "oauth_credential_provider",
             "grant_type",
         )
-        or _dig(data, "grant_type")
         or ""
     )
 

@@ -17,26 +17,21 @@ class GatewayService:
     def ensure_gateway(self, config: GatewayConfig) -> GatewayInfo:
         existing = self.get_gateway_by_name(config.gateway_name)
         if existing is not None:
-            return GatewayInfo(
-                gateway_id=existing.gateway_id,
-                gateway_name=existing.gateway_name,
-                region=existing.region,
-                reused=True,
-                raw=existing.raw,
-            )
+            return existing
         return self.create_gateway(config)
 
     def get_gateway_by_name(self, gateway_name: str) -> GatewayInfo | None:
         try:
-            gateways = self.gateway_http_service.list_mcp_gateways(name=gateway_name)
+            resp = self.gateway_http_service.list_mcp_gateways(name=gateway_name, limit=50, offset=0)
         except Exception as exc:  # noqa: BLE001
             raise GatewayEnsureError(f"查询 gateway 失败: {exc}") from exc
 
-        for item in (gateways or []):
+        gateways = _safe_get(resp, "gateways") or resp or []
+        for item in gateways:
             name = _safe_get(item, "name")
             if name == gateway_name:
                 return GatewayInfo(
-                    gateway_id=_safe_get(item, "id") or _safe_get(item, "gateway_id"),
+                    gateway_id=_safe_get(item, "gateway_id") or _safe_get(item, "id"),
                     gateway_name=name,
                     region=_safe_get(item, "region") or "",
                     reused=True,
@@ -46,20 +41,19 @@ class GatewayService:
 
     def create_gateway(self, config: GatewayConfig) -> GatewayInfo:
         try:
-            response = self.gateway_http_service.create_mcp_gateway(
+            resp = self.gateway_http_service.create_mcp_gateway(
                 name=config.gateway_name,
                 description=config.description,
-                region=config.region,
             )
         except Exception as exc:  # noqa: BLE001
             raise GatewayEnsureError(f"创建 gateway 失败: {exc}") from exc
 
         return GatewayInfo(
-            gateway_id=_safe_get(response, "id") or _safe_get(response, "gateway_id"),
-            gateway_name=_safe_get(response, "name") or config.gateway_name,
-            region=_safe_get(response, "region") or config.region,
+            gateway_id=_safe_get(resp, "gateway_id") or _safe_get(resp, "id"),
+            gateway_name=_safe_get(resp, "name") or config.gateway_name,
+            region=_safe_get(resp, "region") or config.region,
             reused=False,
-            raw=response,
+            raw=resp,
         )
 
 

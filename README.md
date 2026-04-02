@@ -1,12 +1,10 @@
 # MCP Provider/Gateway/Target 接入注册模块
 
-本实现已按要求改为 **仅基于 AgentRun SDK 封装能力**：
+本实现仅基于 AgentRun SDK 封装能力：
 
 - Provider：`IdentityClient`
 - Gateway：`MCPGatewayHttpService`
 - Target：`MCPTargetHttpService`
-
-不再以底层 `huaweicloudsdkagentarts` 编写业务层平行封装。
 
 ## 目录
 
@@ -23,7 +21,8 @@ services/
   target_service.py
   mcp_registration_service.py
 scripts/
-  register_mcp.py   # 可选
+  register.py        # 推荐入口
+  register_mcp.py    # 兼容入口
 ```
 
 ## 统一入口
