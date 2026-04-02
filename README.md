@@ -1,11 +1,12 @@
 # MCP Gateway/Target 接入
 
-当前实现已升级为 **AgentArts SDK Request/Model 对象调用**（不再走 dict body 调用）。
+当前实现已按你的要求改为 **显式 SDK import + 显式 SDK model/request 调用**，不再使用动态反射加载类名。
 
 ## Identity（AgentRun SDK）
 
-使用 `IdentityClient`：
+显式使用：
 
+- `hw_agentrun_wrapper.services.identity.identity_client.IdentityClient`
 - `create_oauth2_credential_provider(name, vendor, client_id, client_secret, tenant_id=None, oauth_discovery=None)`
 
 Provider 幂等策略：
@@ -15,22 +16,14 @@ Provider 幂等策略：
 
 ## AgentArts（AgentArts SDK）
 
-使用 `AgentArtsClient` 核心方法（Request 对象入参）：
+显式 import 并使用如下 request/model：
 
-- `list_core_gateways(ListCoreGatewaysRequest)`
-- `create_core_gateway(CreateCoreGatewayRequest)`
-- `list_core_gateway_targets(ListCoreGatewayTargetsRequest)`
-- `create_core_gateway_target(CreateCoreGatewayTargetRequest)`
-- `update_core_gateway_target(UpdateCoreGatewayTargetRequest)`
-- `show_core_gateway_target(ShowCoreGatewayTargetRequest)`
-
-## 模型对齐
-
-Builder 会实例化真实 SDK 模型：
-
-- `CreateCoreGatewayRequestBody`
-- `CreateCoreGatewayTargetRequestBody`
-- `UpdateCoreGatewayTargetRequestBody`
+- `CreateCoreGatewayRequestBody` / `CreateCoreGatewayRequest`
+- `ListCoreGatewaysRequest`
+- `CreateCoreGatewayTargetRequestBody` / `CreateCoreGatewayTargetRequest`
+- `UpdateCoreGatewayTargetRequestBody` / `UpdateCoreGatewayTargetRequest`
+- `ListCoreGatewayTargetsRequest`
+- `ShowCoreGatewayTargetRequest`
 - `CoreGatewayTargetConfiguration`
 - `CoreGatewayMcpServerTargetConfiguration`
 - `CoreGatewayCredentialProviderConfiguration`
@@ -38,15 +31,12 @@ Builder 会实例化真实 SDK 模型：
 - `CoreGatewayOAuthCredentialProvider`
 - `CoreGatewayTag`
 
-凭据绑定路径：
-
-- `credential_provider_configuration.credential_provider_type = "oauth"`
-- `credential_provider_configuration.credential_provider.oauth_credential_provider.provider_name`
-
-HTTP MCP Target 字段：
+Target 关键字段：
 
 - `target_configuration.mcp_server.endpoint`
 - `target_configuration.mcp_server.server_type`（`sse` / `streamable_http`）
+- `credential_provider_configuration.credential_provider_type = "oauth"`
+- `credential_provider_configuration.credential_provider.oauth_credential_provider.provider_name`
 
 ## 接线方式
 

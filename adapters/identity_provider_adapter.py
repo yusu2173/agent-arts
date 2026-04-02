@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from hw_agentrun_wrapper.services.identity.identity_client import IdentityClient
+
 from domain.dto import OAuth2ProviderConfig, ProviderInfo
 from domain.exceptions import ProviderEnsureError
 
@@ -9,7 +11,7 @@ from domain.exceptions import ProviderEnsureError
 class IdentityProviderAdapter:
     """Identity 适配层，使用 AgentRun SDK 的 IdentityClient。"""
 
-    def __init__(self, identity_client: Any):
+    def __init__(self, identity_client: IdentityClient):
         self.identity_client = identity_client
 
     def ensure_oauth2_provider(self, config: OAuth2ProviderConfig) -> ProviderInfo:

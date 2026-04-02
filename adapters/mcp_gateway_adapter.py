@@ -4,6 +4,8 @@ import time
 from dataclasses import replace
 from typing import Any
 
+from huaweicloudsdkagentarts.v1 import AgentArtsClient
+
 from adapters.model_builders import (
     build_create_core_gateway_request,
     build_create_core_gateway_target_request,
@@ -20,7 +22,7 @@ from domain.exceptions import GatewayEnsureError, TargetEnsureError, TargetNotRe
 class McpGatewayAdapter:
     """AgentArts Core Gateway/Target 适配层（仅使用 SDK Request Model 调用）。"""
 
-    def __init__(self, agentarts_client: Any):
+    def __init__(self, agentarts_client: AgentArtsClient):
         self.client = agentarts_client
 
     def ensure_gateway(self, config: GatewayConfig) -> GatewayInfo:
