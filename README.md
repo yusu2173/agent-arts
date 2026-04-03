@@ -49,10 +49,15 @@ scripts/
 
 `eso` 只作为配置值，不作为路径。
 
-## Identity 区域说明
+## Identity 区域与鉴权说明
 
-如果本地 AgentIdentity SDK 仅支持 `ap-southeast-4`，请单独配置：
-
-- `agentarts.mcp.provider.identity_region=ap-southeast-4`
-
-不要直接复用 gateway 的 `cn-north-4`，否则会触发 `AgentIdentityRegion.value_of(...)` 的 KeyError。
+1. 如果本地 AgentIdentity SDK 仅支持 `ap-southeast-4`，请配置：
+   - `agentarts.mcp.provider.identity_region=ap-southeast-4`
+2. `scripts/register.py` 会显式注入 AK/SK/PROJECT_ID 构建底层 `AgentIdentityClient`，避免触发 metadata 凭证链异常：
+   - `agentarts.ak`
+   - `agentarts.sk`
+   - `agentarts.project_id`
+   或同名环境变量：
+   - `HUAWEICLOUD_SDK_AK`
+   - `HUAWEICLOUD_SDK_SK`
+   - `HUAWEICLOUD_SDK_PROJECT_ID`

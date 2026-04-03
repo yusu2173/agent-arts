@@ -1,5 +1,12 @@
 """MCP 注册脚本（推荐入口）。"""
 
+import os
+
+from huaweicloudsdkagentidentity.v1 import AgentIdentityClient
+from huaweicloudsdkagentidentity.v1.region.agentidentity_region import AgentIdentityRegion
+from huaweicloudsdkcore.auth.credentials import BasicCredentials
+from huaweicloudsdkcore.http.http_config import HttpConfig
+
 from hw_agentrun_wrapper.services.identity.identity_client import IdentityClient
 from hw_agentrun_wrapper.services.mcp_gateway_http import MCPGatewayHttpService
 from hw_agentrun_wrapper.services.mcp_target_http import MCPTargetHttpService
@@ -17,21 +24,35 @@ class ConfigManager:
 def build_identity_client(config_manager: ConfigManager) -> IdentityClient:
     """构建 IdentityClient。
 
-    注意：根据你当前 SDK 报错，AgentIdentityRegion 仅支持 ap-southeast-4。
-    因此这里单独使用 identity_region 配置，不复用 gateway 的 cn-* 区域。
+    这里显式注入 AK/SK，避免 SDK 走 MetadataBasicCredentialProvider 导致本地环境异常。
     """
     identity_region = (
         config_manager.get_config("agentarts.mcp.provider.identity_region")
         or config_manager.get_config("agentarts.mcp.identity.region")
         or "ap-southeast-4"
     )
-    try:
-        return IdentityClient(region=identity_region)
-    except KeyError as exc:
+
+    ak = config_manager.get_config("agentarts.ak") or os.getenv("HUAWEICLOUD_SDK_AK")
+    sk = config_manager.get_config("agentarts.sk") or os.getenv("HUAWEICLOUD_SDK_SK")
+    project_id = config_manager.get_config("agentarts.project_id") or os.getenv("HUAWEICLOUD_SDK_PROJECT_ID")
+
+    if not ak or not sk or not project_id:
         raise RuntimeError(
-            "IdentityClient 区域不受支持。请将 agentarts.mcp.provider.identity_region "
-            "配置为 SDK 支持的区域（当前报错显示为 ap-southeast-4）。"
-        ) from exc
+            "IdentityClient 初始化失败：缺少 AK/SK/PROJECT_ID。"
+            "请配置 agentarts.ak、agentarts.sk、agentarts.project_id 或对应环境变量。"
+        )
+
+    sdk_region = AgentIdentityRegion.value_of(identity_region)
+    credentials = BasicCredentials().with_ak(ak).with_sk(sk).with_project_id(project_id)
+    http_config = HttpConfig(ignore_ssl_verification=True)
+    low_level_client = (
+        AgentIdentityClient.new_builder()
+        .with_region(sdk_region)
+        .with_credentials(credentials)
+        .with_http_config(http_config)
+        .build()
+    )
+    return IdentityClient(region=identity_region, client=low_level_client)
 
 
 def build_gateway_http_service(config_manager: ConfigManager) -> MCPGatewayHttpService:
