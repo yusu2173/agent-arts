@@ -15,8 +15,23 @@ class ConfigManager:
 
 
 def build_identity_client(config_manager: ConfigManager) -> IdentityClient:
-    region = config_manager.get_config("agentarts.mcp.provider.region")
-    return IdentityClient(region=region)
+    """构建 IdentityClient。
+
+    注意：根据你当前 SDK 报错，AgentIdentityRegion 仅支持 ap-southeast-4。
+    因此这里单独使用 identity_region 配置，不复用 gateway 的 cn-* 区域。
+    """
+    identity_region = (
+        config_manager.get_config("agentarts.mcp.provider.identity_region")
+        or config_manager.get_config("agentarts.mcp.identity.region")
+        or "ap-southeast-4"
+    )
+    try:
+        return IdentityClient(region=identity_region)
+    except KeyError as exc:
+        raise RuntimeError(
+            "IdentityClient 区域不受支持。请将 agentarts.mcp.provider.identity_region "
+            "配置为 SDK 支持的区域（当前报错显示为 ap-southeast-4）。"
+        ) from exc
 
 
 def build_gateway_http_service(config_manager: ConfigManager) -> MCPGatewayHttpService:

@@ -48,3 +48,11 @@ scripts/
 - `agentarts.mcp.target.*`
 
 `eso` 只作为配置值，不作为路径。
+
+## Identity 区域说明
+
+如果本地 AgentIdentity SDK 仅支持 `ap-southeast-4`，请单独配置：
+
+- `agentarts.mcp.provider.identity_region=ap-southeast-4`
+
+不要直接复用 gateway 的 `cn-north-4`，否则会触发 `AgentIdentityRegion.value_of(...)` 的 KeyError。
