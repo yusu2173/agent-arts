@@ -77,13 +77,24 @@ class ProviderService:
 
 
 def _build_oauth_discovery(config: ProviderConfig) -> OAuth2Discovery | None:
-    if not any([config.discovery_url, config.token_endpoint, config.authorization_endpoint, config.issuer]):
+    """按当前 SDK 签名构建 OAuth2Discovery。
+
+    当前签名：OAuth2Discovery(discovery_url=None, authorization_server_metadata=None)
+    """
+    metadata = {}
+    if config.token_endpoint:
+        metadata["token_endpoint"] = config.token_endpoint
+    if config.authorization_endpoint:
+        metadata["authorization_endpoint"] = config.authorization_endpoint
+    if config.issuer:
+        metadata["issuer"] = config.issuer
+
+    if not config.discovery_url and not metadata:
         return None
+
     return OAuth2Discovery(
         discovery_url=config.discovery_url,
-        token_endpoint=config.token_endpoint,
-        authorization_endpoint=config.authorization_endpoint,
-        issuer=config.issuer,
+        authorization_server_metadata=metadata or None,
     )
 
 
